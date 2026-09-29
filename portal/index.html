@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jeevaka Industries ERP</title>
+  <title>Jeevaka ERP</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #f0f2f5; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0D7377; }
     iframe {
       position: fixed;
       top: 0; left: 0;
@@ -17,79 +17,69 @@
   </style>
 </head>
 <body>
-
 <iframe id="erp-frame" src="" allowfullscreen allow="fullscreen"></iframe>
-
 <script>
-  // ─── CONFIG ────────────────────────────────────────────────────────────────
-  // Your Google Apps Script deployment URL (with clientId already appended)
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
   var GAS_BASE = 'https://script.google.com/macros/s/AKfycbxvXlM6m4ErR-XOkuMRieXj4vwc_8oGDfzV2TP3azJKcid0uyy_lGOWKBrT9zWWSmTsPQ/exec';
 
-  // Your site's base path — change if you host at /erp/ instead of /
-  var SITE_BASE = '/';
+  var PAGE_TITLES = {
+    dashboard: 'Dashboard',
+    indents:   'Indent',
+    purchase:  'Purchase Order',
+    grn:       'GRN / Receiving',
+    issue:     'Store Issue',
+    stock:     'Stock Balance',
+    items:     'Item Master',
+    admin:     'User Management',
+    vendors:   'Vendors',
+    reports:   'Reports',
+    login:     'Login'
+  };
 
-  // Pages your ERP knows about (used for URL → page validation)
-  var KNOWN_PAGES = [
-    'dashboard','indents','purchase','grn','issue','stock',
-    'items','admin','vendors','reports','login'
-  ];
-
-  // ─── READ PAGE FROM URL PATH ────────────────────────────────────────────────
-  // Maps:  https://diiljeeva.in/purchase  →  page = "purchase"
-  //        https://diiljeeva.in/          →  page = ""  (ERP picks default)
-  //        https://diiljeeva.in/login     →  page = "login"
-  function getPageFromPath() {
-    var path = window.location.pathname;
-    // Strip leading slash and SITE_BASE prefix
-    var base = SITE_BASE.replace(/\/$/, '');
-    if (path.indexOf(base) === 0) path = path.slice(base.length);
-    path = path.replace(/^\//, '').replace(/\/$/, '').toLowerCase();
-    return KNOWN_PAGES.indexOf(path) >= 0 ? path : '';
+  // ── READ PAGE FROM HASH ──────────────────────────────────────────────────────
+  // URL looks like: https://diiljeeva.in/portal/#indents
+  function getPageFromHash() {
+    var hash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+    return PAGE_TITLES[hash] ? hash : '';
   }
 
-  // ─── BUILD IFRAME SRC ───────────────────────────────────────────────────────
-  function buildSrc(page) {
-    return GAS_BASE + (page ? '&page=' + encodeURIComponent(page) : '');
+  function setTitle(page) {
+    document.title = (PAGE_TITLES[page] || 'ERP') + ' | Jeevaka Industries';
   }
 
-  // ─── INIT ───────────────────────────────────────────────────────────────────
+  // ── INIT: build iframe src with ?page= ───────────────────────────────────────
   var frame = document.getElementById('erp-frame');
-  var _currentPage = getPageFromPath();
-  frame.src = buildSrc(_currentPage);
+  var _currentPage = getPageFromHash();
+  frame.src = GAS_BASE + (_currentPage ? '&page=' + encodeURIComponent(_currentPage) : '');
+  setTitle(_currentPage || 'dashboard');
 
-  // Push initial state so history entry exists
-  history.replaceState({ page: _currentPage }, '', window.location.href);
+  // ── POLL HASH: ERP shell writes window.parent.location.hash ─────────────────
+  // GAS iframes CAN write to parent hash (cross-origin hash writes are allowed).
+  // We poll every 300ms to detect changes and update the browser URL cleanly.
+  var _lastHash = window.location.hash;
+  setInterval(function() {
+    var h = window.location.hash;
+    if (h !== _lastHash) {
+      _lastHash = h;
+      var page = getPageFromHash();
+      if (page !== _currentPage) {
+        _currentPage = page;
+        setTitle(page || 'dashboard');
+        // Use pushState so browser history works (back/forward)
+        history.pushState({ page: page }, '', window.location.pathname + '#' + page);
+      }
+    }
+  }, 300);
 
-  // ─── RECEIVE NAV EVENTS FROM ERP IFRAME ────────────────────────────────────
-  // When user clicks a nav item inside the GAS app, it sends:
-  //   window.parent.postMessage({ type: 'ERP_NAV', page: 'purchase' }, '*')
-  window.addEventListener('message', function(e) {
-    if (!e.data || e.data.type !== 'ERP_NAV') return;
-    var page = e.data.page || '';
-    if (page === _currentPage) return; // no duplicate pushes
-    _currentPage = page;
-
-    // Update the browser URL bar  (/purchase, /indents, /login …)
-    var newPath = SITE_BASE.replace(/\/$/, '') + '/' + (page || '');
-    history.pushState({ page: page }, '', newPath || '/');
-
-    // Update tab title
-    document.title = page
-      ? page.charAt(0).toUpperCase() + page.slice(1) + ' | Jeevaka ERP'
-      : 'Jeevaka ERP';
-  });
-
-  // ─── HANDLE BROWSER BACK / FORWARD ─────────────────────────────────────────
+  // ── BROWSER BACK / FORWARD ───────────────────────────────────────────────────
   window.addEventListener('popstate', function(e) {
-    var page = (e.state && e.state.page) || getPageFromPath() || '';
+    var page = (e.state && e.state.page) || getPageFromHash() || '';
     _currentPage = page;
-    // Tell the iframe to navigate there (no full reload)
-    frame.contentWindow.postMessage({ type: 'ERP_POPSTATE', page: page }, '*');
-    document.title = page
-      ? page.charAt(0).toUpperCase() + page.slice(1) + ' | Jeevaka ERP'
-      : 'Jeevaka ERP';
+    _lastHash = '#' + page;
+    setTitle(page || 'dashboard');
+    // Reload iframe to the new page (cleanest approach for GAS)
+    frame.src = GAS_BASE + (page ? '&page=' + encodeURIComponent(page) : '');
   });
 </script>
-
 </body>
 </html>
