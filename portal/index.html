@@ -11,7 +11,7 @@
     /* ── LAYOUT ─────────────────────────────────────────────────────────────── */
     #shell {
       display: grid;
-      grid-template-columns: 210px 1fr;
+      grid-template-columns: 1fr;
       grid-template-rows: 48px 1fr;
       height: 100vh;
       width: 100vw;
@@ -28,7 +28,7 @@
       z-index: 10;
     }
     #top-logo {
-      width: 210px; height: 100%;
+      width: auto; height: 100%; padding-right: 20px;
       background: linear-gradient(180deg, #022c2e 0%, #0D7377 100%);
       display: flex; align-items: center; gap: 9px;
       padding: 0 14px;
@@ -63,9 +63,7 @@
 
     /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
     #sidebar {
-      background: linear-gradient(180deg, #022c2e 0%, #0D7377 100%);
-      display: flex; flex-direction: column; overflow-y: auto; height: 100%;
-      grid-row: 2;
+      display: none;
     }
     .sb-section { padding: 4px 0; }
     .sb-title {
