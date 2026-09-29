@@ -379,9 +379,8 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-// GAS Web App URL — no clientId needed for doPost (we post JSON directly)
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbxvXlM6m4ErR-XOkuMRieXj4vwc_8oGDfzV2TP3azJKcid0uyy_lGOWKBrT9zWWSmTsPQ/exec';
-// GAS iframe URL base — pass token + page so shell skips its own login
+// IMPORTANT: Update this URL to match your deployed GAS Web App URL
+var GAS_URL  = 'https://script.google.com/macros/s/AKfycbxvXlM6m4ErR-XOkuMRieXj4vwc_8oGDfzV2TP3azJKcid0uyy_lGOWKBrT9zWWSmTsPQ/exec';
 var GAS_BASE = GAS_URL + '?clientId=CLI_JVK_1787058819057';
 
 var PAGE_TITLES = {
@@ -392,20 +391,40 @@ var PAGE_TITLES = {
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-var _current  = '';
-var _token    = '';
-var _user     = null;
-var frame     = document.getElementById('erp-frame');
-var overlay   = document.getElementById('loading-overlay');
+var _current = '';
+var _token   = '';
+var _user    = null;
+var frame    = document.getElementById('erp-frame');
+var overlay  = document.getElementById('loading-overlay');
 
-// ── STORAGE (portal's own localStorage — diiljeeva.in origin) ────────────────
+// ── PORTAL STORAGE (diiljeeva.in origin — completely separate from GAS) ───────
 function pStore(key, val) { try { localStorage.setItem('p_' + key, JSON.stringify(val)); } catch(e){} }
-function pRead(key) { try { return JSON.parse(localStorage.getItem('p_' + key) || 'null'); } catch(e){ return null; } }
-function pDel(key) { try { localStorage.removeItem('p_' + key); } catch(e){} }
+function pRead(key)       { try { return JSON.parse(localStorage.getItem('p_' + key) || 'null'); } catch(e){ return null; } }
+function pDel(key)        { try { localStorage.removeItem('p_' + key); } catch(e){} }
+
+// ── GAS FETCH — NO CORS PREFLIGHT ────────────────────────────────────────────
+// KEY FIX: Using Content-Type: application/x-www-form-urlencoded (a "simple request").
+// Browsers only send a CORS preflight for non-simple content types like application/json.
+// GAS does NOT return Access-Control-Allow-Origin headers, so preflight = blocked.
+// With form-urlencoded there is NO preflight → browser sends the request directly → works.
+// We encode the entire JSON payload as a single field called "payload".
+// GAS reads it via: e.parameter.payload (same as any URL/form parameter).
+function gasFetch(data, onSuccess, onError) {
+  var encoded = 'payload=' + encodeURIComponent(JSON.stringify(data));
+  fetch(GAS_URL, {
+    method:   'POST',
+    headers:  { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:     encoded,
+    redirect: 'follow'
+  })
+  .then(function(res) { return res.json(); })
+  .then(onSuccess)
+  .catch(onError || function(){});
+}
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function getHashPage() {
-  var h = window.location.hash.replace(/^#\/?/,'').toLowerCase().trim();
+  var h = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
   return PAGE_TITLES[h] ? h : '';
 }
 function setActiveNav(page) {
@@ -420,12 +439,13 @@ function applyUser(u) {
   if (!u) return;
   document.getElementById('top-username').textContent = u.full_name || u.email || 'User';
   document.getElementById('sb-username').textContent  = u.full_name || u.email || 'User';
-  document.getElementById('sb-role').textContent      = u.designation || (u.role_id||'').replace('ROLE_','') || '';
+  document.getElementById('sb-role').textContent      = u.designation || (u.role_id || '').replace('ROLE_', '') || '';
   document.getElementById('admin-section').style.display = (u.role_id === 'ROLE_ADMIN') ? 'block' : 'none';
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
-// Sidebar click → update URL immediately (same origin = instant), reload iframe
+// Sidebar click → URL updates instantly (same-origin history.pushState),
+// then iframe reloads with new page + token passed in URL so GAS skips login.
 function navTo(page) {
   if (page === _current) return;
   _current = page;
@@ -433,63 +453,55 @@ function navTo(page) {
   setTitle(page);
   setActiveNav(page);
   overlay.classList.remove('hidden');
-  // Pass token + page to GAS so it skips the login screen
   frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(page);
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
-// All auth is done HERE in portal.html via fetch → GAS doPost (HTTP JSON API).
-// No cross-origin localStorage reading needed at all.
 function doLogin() {
   var email = document.getElementById('li-email').value.trim();
   var pass  = document.getElementById('li-pass').value;
-  var errEl = document.getElementById('login-error');
   var btn   = document.getElementById('login-btn');
 
-  errEl.className = 'login-error';
+  document.getElementById('login-error').className = 'login-error';
   if (!email || !pass) { showLoginError('Please enter email and password.'); return; }
 
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Signing in…';
 
-  fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'login', email: email, password: pass }),
-    redirect: 'follow'
-  })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
-    if (data && data.ok && data.token) {
-      _token = data.token;
-      _user  = data.user;
-      pStore('token', _token);
-      pStore('user',  _user);
-      showShell(null); // null = use hash/default page
-    } else {
-      showLoginError(data.error || 'Invalid email or password.');
+  gasFetch(
+    { action: 'login', email: email, password: pass },
+    function(data) {
+      btn.disabled    = false;
+      btn.textContent = 'Sign In';
+      if (data && data.ok && data.token) {
+        _token = data.token;
+        _user  = data.user;
+        pStore('token', _token);
+        pStore('user',  _user);
+        showShell(null);
+      } else {
+        showLoginError((data && data.error) || 'Invalid email or password.');
+      }
+    },
+    function() {
+      btn.disabled    = false;
+      btn.textContent = 'Sign In';
+      showLoginError('Network error. Please check your connection and try again.');
     }
-  })
-  .catch(function(err) {
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
-    showLoginError('Network error. Please check your connection.');
-  });
+  );
 }
 
 function showLoginError(msg) {
   var el = document.getElementById('login-error');
   el.textContent = msg;
-  el.className = 'login-error visible';
+  el.className   = 'login-error visible';
 }
 
 // ── SHELL BOOT ────────────────────────────────────────────────────────────────
 function showShell(forcePage) {
   applyUser(_user);
-  document.getElementById('login-screen').className = '';  // hide login
-  document.getElementById('shell').style.display = 'grid'; // show shell
+  document.getElementById('login-screen').className  = '';      // hide login
+  document.getElementById('shell').style.display     = 'grid';  // show shell
 
   var startPage = forcePage || getHashPage() || 'dashboard';
   _current = startPage;
@@ -497,7 +509,7 @@ function showShell(forcePage) {
   setTitle(startPage);
   history.replaceState({ page: startPage }, '', '/portal/#' + startPage);
 
-  // Load iframe — pass token so GAS skips its own login screen
+  // Load iframe — token in URL so GAS skips its own login screen
   frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(startPage);
 
   frame.addEventListener('load', function() {
@@ -505,45 +517,43 @@ function showShell(forcePage) {
   });
 }
 
-// ── VALIDATE EXISTING TOKEN (fast path — no login needed if token is fresh) ───
+function showLoginScreen() {
+  document.getElementById('login-screen').className = 'visible';
+  document.getElementById('shell').style.display    = 'none';
+  document.title = 'Sign In | Jeevaka Industries';
+}
+
+// ── SESSION RESUME (on page refresh) ─────────────────────────────────────────
+// Reads token from portal's own localStorage (diiljeeva.in origin).
+// Shows shell immediately (optimistic), validates in background via gasFetch.
 function tryResumeSession() {
   var savedToken = pRead('token');
   var savedUser  = pRead('user');
+
   if (!savedToken) {
     showLoginScreen();
     return;
   }
-  // Show shell immediately with cached user (optimistic — validate in background)
+
   _token = savedToken;
   _user  = savedUser;
-  showShell(null);
+  showShell(null); // show immediately — don't make user wait
 
-  // Validate in background — if expired, kick to login
-  fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'validate', token: savedToken }),
-    redirect: 'follow'
-  })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    if (data && data.valid && data.user) {
-      _user = data.user;
-      pStore('user', _user);
-      applyUser(_user); // refresh name/role in sidebar
-    } else {
-      // Token expired — go back to login
-      pDel('token'); pDel('user');
-      doLogout();
+  // Validate in background — kick to login if expired
+  gasFetch(
+    { action: 'validate', token: savedToken },
+    function(data) {
+      if (data && data.valid && data.user) {
+        _user = data.user;
+        pStore('user', _user);
+        applyUser(_user);
+      } else {
+        pDel('token'); pDel('user');
+        doLogout();
+      }
     }
-  })
-  .catch(function() { /* network error — keep showing shell, GAS itself will validate */ });
-}
-
-function showLoginScreen() {
-  document.getElementById('login-screen').className = 'visible';
-  document.getElementById('shell').style.display = 'none';
-  document.title = 'Sign In | Jeevaka Industries';
+    // on network error: keep showing shell (GAS iframe will re-validate on its own)
+  );
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────────
@@ -551,21 +561,14 @@ function doLogout() {
   var tok = _token;
   _token = ''; _user = null; _current = '';
   pDel('token'); pDel('user');
-  // Tell GAS to revoke token (fire-and-forget)
-  if (tok) {
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout', token: tok }),
-      redirect: 'follow'
-    }).catch(function(){});
-  }
   frame.src = '';
   document.getElementById('admin-section').style.display = 'none';
-  document.getElementById('top-username').textContent = '—';
-  document.getElementById('sb-username').textContent = '—';
-  document.getElementById('sb-role').textContent = '';
+  document.getElementById('top-username').textContent    = '—';
+  document.getElementById('sb-username').textContent     = '—';
+  document.getElementById('sb-role').textContent         = '';
   showLoginScreen();
+  // Revoke token server-side (fire-and-forget, no CORS preflight needed)
+  if (tok) gasFetch({ action: 'logout', token: tok });
 }
 
 // ── USER MENU ─────────────────────────────────────────────────────────────────
@@ -580,9 +583,9 @@ document.addEventListener('click', function(e) {
 });
 
 // ── BROWSER BACK / FORWARD ────────────────────────────────────────────────────
-window.addEventListener('popstate', function(e) {
-  if (!_token) return; // not logged in
-  var page = (e.state && e.state.page) || getHashPage() || 'dashboard';
+window.addEventListener('popstate', function(ev) {
+  if (!_token) return;
+  var page = (ev.state && ev.state.page) || getHashPage() || 'dashboard';
   if (page === _current) return;
   _current = page;
   setActiveNav(page);
@@ -591,12 +594,12 @@ window.addEventListener('popstate', function(e) {
   frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(page);
 });
 
-// ── LOGIN FORM ENTER KEY ──────────────────────────────────────────────────────
-document.getElementById('li-pass').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') doLogin();
-});
+// ── ENTER KEY IN LOGIN FORM ───────────────────────────────────────────────────
 document.getElementById('li-email').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') document.getElementById('li-pass').focus();
+});
+document.getElementById('li-pass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
 });
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
