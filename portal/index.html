@@ -452,12 +452,9 @@ function navTo(page) {
   history.pushState({ page: page }, '', '/portal/#' + page);
   setTitle(page);
   setActiveNav(page);
-  // Send nav via postMessage — GAS strips URL params so iframe src reload won't change page
-  try {
-    if (frame && frame.contentWindow) {
-      frame.contentWindow.postMessage({ type: 'PORTAL_NAV', page: page }, '*');
-    }
-  } catch(e) {}
+  overlay.classList.remove('hidden');
+  // Reload iframe with new page — shell reads ?page= from full href
+  frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(page);
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
