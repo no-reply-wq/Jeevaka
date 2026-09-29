@@ -601,6 +601,18 @@ document.getElementById('li-pass').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doLogin();
 });
 
+// ── LISTEN FOR NAV EVENTS FROM GAS SHELL ─────────────────────────────────────
+// GAS shell sends postMessage({ type: 'ERP_NAV', page }) when user clicks its sidebar
+window.addEventListener('message', function(ev) {
+  if (!ev.data || ev.data.type !== 'ERP_NAV' || !ev.data.page) return;
+  var page = ev.data.page;
+  if (page === _current) return;
+  _current = page;
+  history.pushState({ page: page }, '', '/portal/#' + page);
+  setTitle(page);
+  setActiveNav(page);
+});
+
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 tryResumeSession();
 </script>
