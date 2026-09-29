@@ -5,81 +5,603 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jeevaka ERP</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0D7377; }
-    iframe {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      border: none;
-      display: block;
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+
+    /* ── LAYOUT ─────────────────────────────────────────────────────────────── */
+    #shell {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      grid-template-rows: 48px 1fr;
+      height: 100vh;
+      width: 100vw;
     }
+
+    /* ── TOP HEADER ─────────────────────────────────────────────────────────── */
+    #top-header {
+      grid-column: 1 / -1;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px 0 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      z-index: 10;
+    }
+    #top-logo {
+      width: 210px; height: 100%;
+      background: linear-gradient(180deg, #022c2e 0%, #0D7377 100%);
+      display: flex; align-items: center; gap: 9px;
+      padding: 0 14px;
+      font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .3px;
+      flex-shrink: 0;
+    }
+    #top-right {
+      display: flex; align-items: center; gap: 18px;
+      font-size: 12.5px; color: #4b5563;
+    }
+    #top-user {
+      display: flex; align-items: center; gap: 6px;
+      background: #f0f4f4; border-radius: 6px; padding: 5px 11px;
+      cursor: pointer; font-size: 12.5px; font-weight: 600; color: #0D7377;
+      position: relative;
+    }
+    #top-user:hover { background: #e8f5f5; }
+    #user-dropdown {
+      display: none; position: absolute; top: calc(100% + 6px); right: 0;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 160px; z-index: 100;
+      overflow: hidden;
+    }
+    #user-dropdown.open { display: block; }
+    .ud-item {
+      padding: 10px 14px; font-size: 12.5px; color: #374151; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ud-item:hover { background: #f9fafb; }
+    .ud-item.danger { color: #dc2626; }
+    .ud-item.danger:hover { background: #fef2f2; }
+
+    /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
+    #sidebar {
+      background: linear-gradient(180deg, #022c2e 0%, #0D7377 100%);
+      display: flex; flex-direction: column; overflow-y: auto; height: 100%;
+      grid-row: 2;
+    }
+    .sb-section { padding: 4px 0; }
+    .sb-title {
+      padding: 10px 14px 4px; font-size: 9.5px; font-weight: 700;
+      color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: 1px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; margin: 1px 8px; font-size: 13px;
+      color: rgba(255,255,255,.65); cursor: pointer;
+      border-radius: 8px; border-left: none;
+      transition: background .12s, color .12s; position: relative;
+      user-select: none;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .nav-item.active { background: rgba(255,255,255,.18); color: #fff; font-weight: 600; }
+    .nav-item.active::before {
+      content:''; position:absolute; left:-8px; top:50%; transform:translateY(-50%);
+      width:3px; height:18px; background:#fff; border-radius:0 3px 3px 0;
+    }
+    .nav-icon { width:16px; height:16px; flex-shrink:0; }
+    #sb-footer {
+      margin-top: auto; padding: 12px 10px;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    #sb-user-info {
+      font-size: 12px; color: rgba(255,255,255,.55); margin-bottom: 10px; padding: 0 4px; line-height: 1.5;
+    }
+    #sb-user-info b { color: rgba(255,255,255,.85); }
+    #btn-logout {
+      width:100%; padding:8px; border-radius:8px;
+      background:rgba(255,80,80,.12); color:rgba(255,170,170,.85);
+      border:1px solid rgba(255,100,100,.2); font-size:12.5px; font-weight:600;
+      cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:6px;
+    }
+    #btn-logout:hover { background:rgba(255,80,80,.22); color:#fca5a5; }
+    #sb-powered {
+      font-size:10.5px; color:rgba(255,255,255,.3); text-align:center;
+      padding:6px 0 2px; border-top:1px solid rgba(255,255,255,.08); margin-top:8px;
+    }
+    #sb-powered a { color:rgba(255,255,255,.5); text-decoration:none; font-weight:600; }
+    #admin-section { display:none; }
+
+    /* ── CONTENT IFRAME ──────────────────────────────────────────────────────── */
+    #content-wrap {
+      grid-row: 2; position: relative; overflow: hidden;
+      background: #f0f4f4;
+    }
+    #erp-frame {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      border: none; display: block;
+    }
+
+    /* ── LOADING OVERLAY ────────────────────────────────────────────────────── */
+    #loading-overlay {
+      position: absolute; inset: 0; z-index: 5;
+      background: #f0f4f4;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+    }
+    #loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #d1e8e8;
+      border-top-color: #0D7377;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 13px; color: #6b7280; font-weight: 500; }
+
+    /* ── LOGIN SCREEN ────────────────────────────────────────────────────────── */
+    #login-screen {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: linear-gradient(135deg, #022c2e 0%, #0D7377 60%, #14a085 100%);
+      align-items: center; justify-content: center;
+    }
+    #login-screen.visible { display: flex; }
+    .login-card {
+      background: #fff; border-radius: 18px;
+      padding: 40px 36px 36px;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.22);
+    }
+    .login-logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 28px;
+    }
+    .login-logo-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg,#022c2e,#0D7377);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-title { font-size: 17px; font-weight: 700; color: #111827; }
+    .login-sub   { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .login-field { margin-bottom: 16px; }
+    .login-field label { display:block; font-size:12.5px; font-weight:600; color:#374151; margin-bottom:5px; }
+    .login-field input {
+      width:100%; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px;
+      font-size:13.5px; color:#111827; outline:none; transition:border .15s;
+    }
+    .login-field input:focus { border-color:#0D7377; box-shadow:0 0 0 3px rgba(13,115,119,.1); }
+    #login-btn {
+      width:100%; padding:11px; border:none; border-radius:9px;
+      background: linear-gradient(135deg,#022c2e,#0D7377);
+      color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+      letter-spacing:.3px; transition:opacity .15s; margin-top:4px;
+    }
+    #login-btn:hover { opacity:.88; }
+    #login-btn:disabled { opacity:.55; cursor:not-allowed; }
+    #login-error {
+      display:none; margin-top:14px; padding:10px 13px;
+      background:#fef2f2; border:1px solid #fca5a5; border-radius:8px;
+      color:#dc2626; font-size:12.5px; line-height:1.5;
+    }
+    #login-error.visible { display:block; }
   </style>
 </head>
 <body>
-<iframe id="erp-frame" src="" allowfullscreen allow="fullscreen"></iframe>
+
+<!-- ── LOGIN SCREEN (shown first; hidden after successful auth) ──────────────── -->
+<div id="login-screen" class="visible">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.8" width="22" height="22">
+          <rect x="2" y="7" width="20" height="14" rx="1"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          <line x1="12" y1="12" x2="12" y2="16"/>
+          <line x1="10" y1="14" x2="14" y2="14"/>
+        </svg>
+      </div>
+      <div>
+        <div class="login-title">Jeevaka ERP</div>
+        <div class="login-sub">Sign in to your account</div>
+      </div>
+    </div>
+    <div class="login-field">
+      <label for="li-email">Email Address</label>
+      <input type="email" id="li-email" placeholder="you@company.com" autocomplete="username" autofocus>
+    </div>
+    <div class="login-field">
+      <label for="li-pass">Password</label>
+      <input type="password" id="li-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button id="login-btn" onclick="doLogin()">Sign In</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── MAIN SHELL (hidden until login) ──────────────────────────────────────── -->
+<div id="shell" style="display:none">
+
+  <!-- TOP HEADER -->
+  <div id="top-header">
+    <div id="top-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.8" width="20" height="20">
+        <rect x="2" y="7" width="20" height="14" rx="1"/>
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        <line x1="12" y1="12" x2="12" y2="16"/>
+        <line x1="10" y1="14" x2="14" y2="14"/>
+      </svg>
+      JEEVAKA INDUSTRIES
+    </div>
+    <div id="top-right">
+      <span style="display:flex;align-items:center;gap:5px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.71 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 5.82 5.82l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+        9088880077 / 9088844477
+      </span>
+      <div id="top-user" onclick="toggleUserMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span id="top-username">—</span> ▾
+        <div id="user-dropdown">
+          <div class="ud-item danger" onclick="doLogout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-section" style="padding:8px 0 4px">
+      <div class="sb-title">Main</div>
+      <div class="nav-item active" data-page="dashboard" onclick="navTo('dashboard')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <span>Dashboard</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Purchase</div>
+      <div class="nav-item" data-page="indents" onclick="navTo('indents')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span>Indent</span>
+      </div>
+      <div class="nav-item" data-page="purchase" onclick="navTo('purchase')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+          <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/>
+        </svg>
+        <span>Purchase Order</span>
+      </div>
+      <div class="nav-item" data-page="grn" onclick="navTo('grn')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="3" width="15" height="13"/>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+          <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+        </svg>
+        <span>GRN / Receiving</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Inventory</div>
+      <div class="nav-item" data-page="issue" onclick="navTo('issue')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span>Store Issue</span>
+      </div>
+      <div class="nav-item" data-page="stock" onclick="navTo('stock')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+        <span>Stock Balance</span>
+      </div>
+      <div class="nav-item" data-page="items" onclick="navTo('items')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        <span>Item Master</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Reports</div>
+      <div class="nav-item" data-page="reports" onclick="navTo('reports')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span>Reports</span>
+      </div>
+    </div>
+    <div class="sb-section" id="admin-section">
+      <div class="sb-title">Admin</div>
+      <div class="nav-item" data-page="admin" onclick="navTo('admin')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span>User Management</span>
+      </div>
+      <div class="nav-item" data-page="vendors" onclick="navTo('vendors')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span>Vendors</span>
+      </div>
+    </div>
+    <div id="sb-footer">
+      <div id="sb-user-info"><b id="sb-username">—</b><br><span id="sb-role"></span></div>
+      <button id="btn-logout" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+      </button>
+      <div id="sb-powered">Powered by <a href="https://lrbc.ai" target="_blank">LRBC</a> (lrbc.ai)</div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content-wrap">
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading Jeevaka ERP…</div>
+    </div>
+    <iframe id="erp-frame" src="" title="Jeevaka ERP"></iframe>
+  </div>
+
+</div><!-- /shell -->
+
 <script>
-  // ── CONFIG ──────────────────────────────────────────────────────────────────
-  var GAS_BASE = 'https://script.google.com/macros/s/AKfycbxvXlM6m4ErR-XOkuMRieXj4vwc_8oGDfzV2TP3azJKcid0uyy_lGOWKBrT9zWWSmTsPQ/exec';
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+// GAS Web App URL — no clientId needed for doPost (we post JSON directly)
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbxvXlM6m4ErR-XOkuMRieXj4vwc_8oGDfzV2TP3azJKcid0uyy_lGOWKBrT9zWWSmTsPQ/exec';
+// GAS iframe URL base — pass token + page so shell skips its own login
+var GAS_BASE = GAS_URL + '?clientId=CLI_JVK_1787058819057';
 
-  var PAGE_TITLES = {
-    dashboard: 'Dashboard',
-    indents:   'Indent',
-    purchase:  'Purchase Order',
-    grn:       'GRN / Receiving',
-    issue:     'Store Issue',
-    stock:     'Stock Balance',
-    items:     'Item Master',
-    admin:     'User Management',
-    vendors:   'Vendors',
-    reports:   'Reports',
-    login:     'Login'
-  };
+var PAGE_TITLES = {
+  dashboard:'Dashboard', indents:'Indent', purchase:'Purchase Order',
+  grn:'GRN / Receiving', issue:'Store Issue', stock:'Stock Balance',
+  items:'Item Master', admin:'User Management', vendors:'Vendors',
+  reports:'Reports'
+};
 
-  // ── READ PAGE FROM HASH ──────────────────────────────────────────────────────
-  // URL looks like: https://diiljeeva.in/portal/#indents
-  function getPageFromHash() {
-    var hash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
-    return PAGE_TITLES[hash] ? hash : '';
-  }
+// ── STATE ─────────────────────────────────────────────────────────────────────
+var _current  = '';
+var _token    = '';
+var _user     = null;
+var frame     = document.getElementById('erp-frame');
+var overlay   = document.getElementById('loading-overlay');
 
-  function setTitle(page) {
-    document.title = (PAGE_TITLES[page] || 'ERP') + ' | Jeevaka Industries';
-  }
+// ── STORAGE (portal's own localStorage — diiljeeva.in origin) ────────────────
+function pStore(key, val) { try { localStorage.setItem('p_' + key, JSON.stringify(val)); } catch(e){} }
+function pRead(key) { try { return JSON.parse(localStorage.getItem('p_' + key) || 'null'); } catch(e){ return null; } }
+function pDel(key) { try { localStorage.removeItem('p_' + key); } catch(e){} }
 
-  // ── INIT: build iframe src with ?page= ───────────────────────────────────────
-  var frame = document.getElementById('erp-frame');
-  var _currentPage = getPageFromHash();
-  frame.src = GAS_BASE + (_currentPage ? '&page=' + encodeURIComponent(_currentPage) : '');
-  setTitle(_currentPage || 'dashboard');
-
-  // ── POLL HASH: ERP shell writes window.parent.location.hash ─────────────────
-  // GAS iframes CAN write to parent hash (cross-origin hash writes are allowed).
-  // We poll every 300ms to detect changes and update the browser URL cleanly.
-  var _lastHash = window.location.hash;
-  setInterval(function() {
-    var h = window.location.hash;
-    if (h !== _lastHash) {
-      _lastHash = h;
-      var page = getPageFromHash();
-      if (page !== _currentPage) {
-        _currentPage = page;
-        setTitle(page || 'dashboard');
-        // Use pushState so browser history works (back/forward)
-        history.pushState({ page: page }, '', window.location.pathname + '#' + page);
-      }
-    }
-  }, 300);
-
-  // ── BROWSER BACK / FORWARD ───────────────────────────────────────────────────
-  window.addEventListener('popstate', function(e) {
-    var page = (e.state && e.state.page) || getPageFromHash() || '';
-    _currentPage = page;
-    _lastHash = '#' + page;
-    setTitle(page || 'dashboard');
-    // Reload iframe to the new page (cleanest approach for GAS)
-    frame.src = GAS_BASE + (page ? '&page=' + encodeURIComponent(page) : '');
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function getHashPage() {
+  var h = window.location.hash.replace(/^#\/?/,'').toLowerCase().trim();
+  return PAGE_TITLES[h] ? h : '';
+}
+function setActiveNav(page) {
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.page === page);
   });
+}
+function setTitle(page) {
+  document.title = (PAGE_TITLES[page] || 'ERP') + ' | Jeevaka Industries';
+}
+function applyUser(u) {
+  if (!u) return;
+  document.getElementById('top-username').textContent = u.full_name || u.email || 'User';
+  document.getElementById('sb-username').textContent  = u.full_name || u.email || 'User';
+  document.getElementById('sb-role').textContent      = u.designation || (u.role_id||'').replace('ROLE_','') || '';
+  document.getElementById('admin-section').style.display = (u.role_id === 'ROLE_ADMIN') ? 'block' : 'none';
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+// Sidebar click → update URL immediately (same origin = instant), reload iframe
+function navTo(page) {
+  if (page === _current) return;
+  _current = page;
+  history.pushState({ page: page }, '', '/portal/#' + page);
+  setTitle(page);
+  setActiveNav(page);
+  overlay.classList.remove('hidden');
+  // Pass token + page to GAS so it skips the login screen
+  frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(page);
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+// All auth is done HERE in portal.html via fetch → GAS doPost (HTTP JSON API).
+// No cross-origin localStorage reading needed at all.
+function doLogin() {
+  var email = document.getElementById('li-email').value.trim();
+  var pass  = document.getElementById('li-pass').value;
+  var errEl = document.getElementById('login-error');
+  var btn   = document.getElementById('login-btn');
+
+  errEl.className = 'login-error';
+  if (!email || !pass) { showLoginError('Please enter email and password.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'login', email: email, password: pass }),
+    redirect: 'follow'
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+    if (data && data.ok && data.token) {
+      _token = data.token;
+      _user  = data.user;
+      pStore('token', _token);
+      pStore('user',  _user);
+      showShell(null); // null = use hash/default page
+    } else {
+      showLoginError(data.error || 'Invalid email or password.');
+    }
+  })
+  .catch(function(err) {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+    showLoginError('Network error. Please check your connection.');
+  });
+}
+
+function showLoginError(msg) {
+  var el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.className = 'login-error visible';
+}
+
+// ── SHELL BOOT ────────────────────────────────────────────────────────────────
+function showShell(forcePage) {
+  applyUser(_user);
+  document.getElementById('login-screen').className = '';  // hide login
+  document.getElementById('shell').style.display = 'grid'; // show shell
+
+  var startPage = forcePage || getHashPage() || 'dashboard';
+  _current = startPage;
+  setActiveNav(startPage);
+  setTitle(startPage);
+  history.replaceState({ page: startPage }, '', '/portal/#' + startPage);
+
+  // Load iframe — pass token so GAS skips its own login screen
+  frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(startPage);
+
+  frame.addEventListener('load', function() {
+    overlay.classList.add('hidden');
+  });
+}
+
+// ── VALIDATE EXISTING TOKEN (fast path — no login needed if token is fresh) ───
+function tryResumeSession() {
+  var savedToken = pRead('token');
+  var savedUser  = pRead('user');
+  if (!savedToken) {
+    showLoginScreen();
+    return;
+  }
+  // Show shell immediately with cached user (optimistic — validate in background)
+  _token = savedToken;
+  _user  = savedUser;
+  showShell(null);
+
+  // Validate in background — if expired, kick to login
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'validate', token: savedToken }),
+    redirect: 'follow'
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data && data.valid && data.user) {
+      _user = data.user;
+      pStore('user', _user);
+      applyUser(_user); // refresh name/role in sidebar
+    } else {
+      // Token expired — go back to login
+      pDel('token'); pDel('user');
+      doLogout();
+    }
+  })
+  .catch(function() { /* network error — keep showing shell, GAS itself will validate */ });
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').className = 'visible';
+  document.getElementById('shell').style.display = 'none';
+  document.title = 'Sign In | Jeevaka Industries';
+}
+
+// ── LOGOUT ────────────────────────────────────────────────────────────────────
+function doLogout() {
+  var tok = _token;
+  _token = ''; _user = null; _current = '';
+  pDel('token'); pDel('user');
+  // Tell GAS to revoke token (fire-and-forget)
+  if (tok) {
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout', token: tok }),
+      redirect: 'follow'
+    }).catch(function(){});
+  }
+  frame.src = '';
+  document.getElementById('admin-section').style.display = 'none';
+  document.getElementById('top-username').textContent = '—';
+  document.getElementById('sb-username').textContent = '—';
+  document.getElementById('sb-role').textContent = '';
+  showLoginScreen();
+}
+
+// ── USER MENU ─────────────────────────────────────────────────────────────────
+function toggleUserMenu() {
+  document.getElementById('user-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var tu = document.getElementById('top-user');
+  if (tu && !tu.contains(e.target)) {
+    document.getElementById('user-dropdown').classList.remove('open');
+  }
+});
+
+// ── BROWSER BACK / FORWARD ────────────────────────────────────────────────────
+window.addEventListener('popstate', function(e) {
+  if (!_token) return; // not logged in
+  var page = (e.state && e.state.page) || getHashPage() || 'dashboard';
+  if (page === _current) return;
+  _current = page;
+  setActiveNav(page);
+  setTitle(page);
+  overlay.classList.remove('hidden');
+  frame.src = GAS_BASE + '&token=' + encodeURIComponent(_token) + '&page=' + encodeURIComponent(page);
+});
+
+// ── LOGIN FORM ENTER KEY ──────────────────────────────────────────────────────
+document.getElementById('li-pass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('li-email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('li-pass').focus();
+});
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+tryResumeSession();
 </script>
+
 </body>
 </html>
